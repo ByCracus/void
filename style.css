@@ -51,43 +51,32 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Cursor — Black Hole ── */
+/* Width, height and box-shadow are driven entirely by JS (scroll-based mass) */
 .cursor {
     position: fixed;
     z-index: 9999;
-    width: 10px;
-    height: 10px;
     background: var(--void);
     border: 1.5px solid rgba(200, 255, 0, 0.55);
     border-radius: 50%;
     pointer-events: none;
     transform: translate(-50%, -50%);
-    box-shadow: 0 0 6px rgba(200, 255, 0, 0.2);
-    transition: width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease;
 }
 
 .cursor-halo {
     position: fixed;
     z-index: 9998;
-    width: 44px;
-    height: 44px;
     border: 1px solid rgba(200, 255, 0, 0.1);
     border-radius: 50%;
     pointer-events: none;
     transform: translate(-50%, -50%);
-    transition: width 0.4s ease, height 0.4s ease, border-color 0.3s ease;
 }
 
-body:has(a:hover) .cursor,
-body:has(button:hover) .cursor {
-    width: 16px;
-    height: 16px;
-    box-shadow: 0 0 14px rgba(200, 255, 0, 0.35);
+body:has(a:hover) .cursor {
+    border-color: rgba(200, 255, 0, 0.85);
 }
 
 body:has(a:hover) .cursor-halo {
-    width: 58px;
-    height: 58px;
-    border-color: rgba(200, 255, 0, 0.2);
+    border-color: rgba(200, 255, 0, 0.25);
 }
 
 /* ── Loader ── */

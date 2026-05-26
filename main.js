@@ -5,6 +5,7 @@
 
     const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     let scrollProgress = 0;
+    let cursorSize = 10; // driven by scroll, updated every frame
 
     // ── Canvas: Starfield ──
     const canvas = document.getElementById('cosmos');
@@ -52,19 +53,24 @@
         const px = (mouse.x - W / 2) * 0.01;
         const py = (mouse.y - H / 2) * 0.01;
 
+        // Pull radius and strength scale with cursor size
+        const pullRadius = Math.max(200, cursorSize * 3.5);
+        const pullStrength = 14 + scrollProgress * 55;
+
         for (const s of stars) {
             s.pulse += s.pulseSpeed;
             const pulse = Math.sin(s.pulse) * 0.3 + 0.7;
             let ox = s.x + px * s.z;
             let oy = s.y + py * s.z;
 
-            // Black hole cursor — gravitational pull on nearby stars
+            // Black hole cursor — gravity scales with cursor mass
             const cdx = ox - mouse.x;
             const cdy = oy - mouse.y;
             const cDist2 = cdx * cdx + cdy * cdy;
-            if (cDist2 < 40000 && cDist2 > 1) {
+            const pullRadius2 = pullRadius * pullRadius;
+            if (cDist2 < pullRadius2 && cDist2 > 1) {
                 const cDist = Math.sqrt(cDist2);
-                const pull = (1 - cDist / 200) * 14;
+                const pull = (1 - cDist / pullRadius) * pullStrength;
                 ox -= (cdx / cDist) * pull;
                 oy -= (cdy / cDist) * pull;
             }
@@ -110,7 +116,7 @@
             ctx.stroke();
         }
 
-        // Nebula fog — appears in the acceleration zone
+        // Nebula fog
         if (scrollProgress > 0.22 && scrollProgress < 0.52) {
             const t = Math.sin(((scrollProgress - 0.22) / 0.3) * Math.PI);
             const fog = ctx.createRadialGradient(
@@ -145,13 +151,97 @@
         applyMagnet();
     }
 
-    function animateHalo() {
-        fx += (mouse.x - fx) * 0.11;
-        fy += (mouse.y - fy) * 0.11;
-        if (halo) {
-            halo.style.left = fx + 'px';
-            halo.style.top = fy + 'px';
+    // ── Text Absorption ──
+    // Tracks per-element translate state so movement is lerped each frame
+    const absorbState = new Map();
+
+    function absorbText() {
+        if (cursorSize < 22) {
+            // Reset all when cursor is still small
+            absorbState.forEach((state, el) => {
+                if (state.tx !== 0 || state.ty !== 0) {
+                    state.tx *= 0.85;
+                    state.ty *= 0.85;
+                    el.style.translate = `${state.tx}px ${state.ty}px`;
+                }
+            });
+            return;
         }
+
+        const absorbRadius = cursorSize * 2.4;
+        const killRadius   = cursorSize * 0.6;
+
+        const els = document.querySelectorAll(
+            '.section-heading .rline.revealed, .beyond-title .rline.revealed, ' +
+            '.section-desc.revealed, .beyond-manifesto.revealed, .beyond-question.revealed'
+        );
+
+        els.forEach((el) => {
+            if (!absorbState.has(el)) absorbState.set(el, { tx: 0, ty: 0 });
+            const state = absorbState.get(el);
+
+            const rect = el.getBoundingClientRect();
+            const cx   = rect.left + rect.width  * 0.5;
+            const cy   = rect.top  + rect.height * 0.5;
+            const dx   = fx - cx;
+            const dy   = fy - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            let targetTx = 0, targetTy = 0;
+
+            if (dist < absorbRadius && dist > 0) {
+                const force  = Math.pow(1 - dist / absorbRadius, 2.2);
+                const maxPull = cursorSize * 0.4;
+                targetTx = (dx / dist) * force * maxPull;
+                targetTy = (dy / dist) * force * maxPull;
+            }
+
+            // Lerp toward target — heavy, satisfying drag
+            state.tx += (targetTx - state.tx) * 0.1;
+            state.ty += (targetTy - state.ty) * 0.1;
+
+            el.style.translate = `${state.tx}px ${state.ty}px`;
+
+            // Fade out when swallowed
+            if (dist < killRadius && dist > 0) {
+                el.style.opacity = String(Math.max(0, dist / killRadius));
+            } else {
+                el.style.opacity = '';
+            }
+        });
+    }
+
+    function animateHalo() {
+        // Cursor size: starts at 10px, grows quadratically to ~230px at full scroll
+        const targetSize = 10 + scrollProgress * scrollProgress * 220;
+        cursorSize += (targetSize - cursorSize) * 0.07;
+
+        // Heaviness: lerp slows as cursor grows — feels like it gains mass
+        const lerpFactor = Math.max(0.022, 0.11 - scrollProgress * 0.088);
+        fx += (mouse.x - fx) * lerpFactor;
+        fy += (mouse.y - fy) * lerpFactor;
+
+        // Apply sizes to DOM — JS is the single source of truth
+        if (cursor) {
+            cursor.style.width  = cursorSize + 'px';
+            cursor.style.height = cursorSize + 'px';
+            // Scale glow with mass
+            const glow = scrollProgress * 18;
+            cursor.style.boxShadow = `0 0 ${6 + glow}px rgba(200,255,0,${0.2 + scrollProgress * 0.25})`;
+        }
+        if (halo) {
+            halo.style.left   = fx + 'px';
+            halo.style.top    = fy + 'px';
+            const haloSize    = Math.max(44, cursorSize * 3.8);
+            halo.style.width  = haloSize + 'px';
+            halo.style.height = haloSize + 'px';
+            // Halo ring thickens slightly
+            const haloAlpha = 0.1 + scrollProgress * 0.12;
+            halo.style.borderColor = `rgba(200,255,0,${haloAlpha})`;
+        }
+
+        absorbText();
+
         requestAnimationFrame(animateHalo);
     }
 
@@ -161,15 +251,14 @@
     function applyMagnet() {
         magEls.forEach((el) => {
             const rect = el.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
+            const cx = rect.left + rect.width  / 2;
+            const cy = rect.top  + rect.height / 2;
             const dx = mouse.x - cx;
             const dy = mouse.y - cy;
             const dist = Math.sqrt(dx * dx + dy * dy);
             const threshold = 90;
             if (dist < threshold && dist > 0) {
                 const force = 1 - dist / threshold;
-                // Use individual translate property to compose with other transforms
                 el.style.translate = `${dx * force * 0.28}px ${dy * force * 0.28}px`;
             } else {
                 el.style.translate = '';
@@ -198,8 +287,8 @@
     function runLoader() {
         return new Promise((resolve) => {
             const loaderText = document.getElementById('loaderText');
-            const fill = document.getElementById('loaderFill');
-            const loader = document.getElementById('loader');
+            const fill       = document.getElementById('loaderFill');
+            const loader     = document.getElementById('loader');
 
             loaderText.textContent = '';
             setTimeout(() => scramble(loaderText, 'void.', 900), 200);
@@ -253,7 +342,6 @@
     function setupScrollAnimations() {
         gsap.registerPlugin(ScrollTrigger);
 
-        // Global scroll progress
         ScrollTrigger.create({
             start: 'top top',
             end: 'bottom bottom',
@@ -263,7 +351,6 @@
             },
         });
 
-        // Hero content parallax out
         gsap.to('.hero-content', {
             y: -110,
             opacity: 0,
@@ -287,7 +374,6 @@
             },
         });
 
-        // Origin circle expand on scroll
         gsap.to('#originCircle', {
             scale: 1.3,
             opacity: 0.5,
@@ -300,7 +386,6 @@
             },
         });
 
-        // Section watermark parallax
         gsap.utils.toArray('.section-num').forEach((num) => {
             const section = num.closest('.section');
             if (!section) return;
