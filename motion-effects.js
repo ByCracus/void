@@ -20,6 +20,9 @@
                 const cta = parent.querySelector('.beyond-cta');
                 if (cta) cta.classList.add('revealed');
             }
+            if (target.closest('.beyond-inner')) {
+                setTimeout(() => { if (window._voidCollapse) window._voidCollapse(); }, 2500);
+            }
             revealObserver.unobserve(target);
         });
     }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
