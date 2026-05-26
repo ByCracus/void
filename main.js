@@ -369,16 +369,18 @@
             transformOrigin: 'center center',
         });
 
-        // CTA flips to void palette and survives
+        // CTA: kill CSS transition, hide immediately, then reveal in void colors
         if (cta) {
+            gsap.killTweensOf(cta);
+            gsap.set(cta, { opacity: 0, y: 0 });
             gsap.to(cta, {
+                opacity:     1,
                 color:       '#dddde8',
                 borderColor: 'rgba(200,255,0,0.45)',
-                duration: 1.4,
-                delay:    1.8,
-                ease:    'power2.inOut',
+                duration:    1,
+                delay:       2.4,
+                ease:        'power2.out',
             });
-            // After collapse — full reload on click
             cta.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
