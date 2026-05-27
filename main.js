@@ -215,6 +215,13 @@
 
     // ── Text Absorption ──
     const absorbState = new Map();
+    const absorbed    = new Set();   // permanently consumed elements
+
+    const ABSORB_SEL =
+        '.section-num, .section-label, .nav-logo, ' +
+        '.rline.revealed, [data-reveal-fade].revealed, ' +
+        '.section-desc, .beyond-num, #scrollHint, ' +
+        '.hero-eyebrow, .hero-sub';
 
     function absorbText() {
         if (cursorSize < 22) {
@@ -228,14 +235,13 @@
             return;
         }
 
-        const absorbRadius = cursorSize * 2.4;
-        const killRadius   = cursorSize * 0.6;
-        const els = document.querySelectorAll(
-            '.section-heading .rline.revealed, .beyond-title .rline.revealed, ' +
-            '.section-desc.revealed, .beyond-manifesto.revealed, .beyond-question.revealed'
-        );
+        const absorbRadius = cursorSize * 2.6;
+        const killRadius   = cursorSize * 0.55;
+        const els          = document.querySelectorAll(ABSORB_SEL);
 
         els.forEach((el) => {
+            if (absorbed.has(el)) return;
+
             if (!absorbState.has(el)) absorbState.set(el, { tx: 0, ty: 0 });
             const state = absorbState.get(el);
             const rect  = el.getBoundingClientRect();
@@ -247,8 +253,8 @@
 
             let targetTx = 0, targetTy = 0;
             if (dist < absorbRadius && dist > 0) {
-                const force   = Math.pow(1 - dist / absorbRadius, 2.2);
-                const maxPull = cursorSize * 0.4;
+                const force   = Math.pow(1 - dist / absorbRadius, 2.5);
+                const maxPull = cursorSize * 0.55;
                 targetTx = (dx / dist) * force * maxPull;
                 targetTy = (dy / dist) * force * maxPull;
             }
@@ -258,7 +264,14 @@
             el.style.translate = `${state.tx}px ${state.ty}px`;
 
             if (dist < killRadius && dist > 0) {
-                el.style.opacity = String(Math.max(0, dist / killRadius));
+                const opacity = Math.max(0, dist / killRadius);
+                el.style.opacity = String(opacity);
+                if (opacity <= 0.04) {
+                    // Permanently consumed by the void
+                    absorbed.add(el);
+                    el.style.opacity   = '0';
+                    el.style.translate = '';
+                }
             } else {
                 el.style.opacity = '';
             }
