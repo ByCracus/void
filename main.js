@@ -14,6 +14,7 @@
     const ctx    = canvas.getContext('2d');
     let stars = [], shootingStars = [], W, H;
     let collapseOriginX = 0, collapseOriginY = 0;
+    let lenis = null;
 
     function resize() {
         W = canvas.width  = window.innerWidth;
@@ -345,6 +346,12 @@
         collapseOriginY = fy;
         collapseTriggered = true;
 
+        // Stop scroll during collapse, re-enable after so user can slide up to void
+        if (lenis) {
+            lenis.stop();
+            setTimeout(() => { if (lenis) lenis.start(); }, 2200);
+        }
+
         const section = document.querySelector('.section-choice');
         const footer  = document.querySelector('.section-choice .footer');
         const textEls = document.querySelectorAll(
@@ -353,13 +360,25 @@
             '.beyond-question.revealed, .beyond-manifesto.revealed'
         );
 
-        // Background bleeds to void
+        // ── Choice section: background bleeds to void ──
         gsap.to(section, { backgroundColor: '#060608', duration: 1.6, ease: 'power2.inOut' });
-        if (footer) gsap.to(footer, { opacity: 0, duration: 0.5, delay: 0.1 });
 
-        // Suck every text element toward the cursor position
+        // Footer survives — transition to void palette so it's visible on dark bg
+        if (footer) {
+            gsap.to(footer, {
+                color:          'rgba(180,190,210,0.22)',
+                borderTopColor: 'rgba(180,190,210,0.07)',
+                duration: 1.4,
+                delay:    1.0,
+                ease:     'power2.inOut',
+            });
+            const link = footer.querySelector('a');
+            if (link) gsap.to(link, { color: 'rgba(180,190,210,0.45)', duration: 1.4, delay: 1.0 });
+        }
+
+        // ── Suck visible choice section text toward cursor ──
         textEls.forEach((el, i) => {
-            el.style.translate = ''; // clear any absorbText offset
+            el.style.translate = '';
             const rect = el.getBoundingClientRect();
             const dx = collapseOriginX - (rect.left + rect.width  * 0.5);
             const dy = collapseOriginY - (rect.top  + rect.height * 0.5);
@@ -374,7 +393,14 @@
             });
         });
 
-        // Drive canvas collapse
+        // ── Consume every section above (void spreads upward) ──
+        gsap.to('#nav', { opacity: 0, duration: 0.7, delay: 0.3, ease: 'power2.in' });
+        gsap.to('.section-paradox', { opacity: 0, duration: 1.0, delay: 0.5, ease: 'power2.in' });
+        gsap.to('.section-acceleration', { opacity: 0, duration: 1.0, delay: 0.75, ease: 'power2.in' });
+        gsap.to('.section-ignition',     { opacity: 0, duration: 1.0, delay: 1.0,  ease: 'power2.in' });
+        gsap.to('.section-hero',         { opacity: 0, duration: 1.0, delay: 1.25, ease: 'power2.in' });
+
+        // ── Drive canvas collapse ──
         const proxy = { p: 0 };
         gsap.to(proxy, {
             p:        1,
@@ -489,7 +515,7 @@
 
         await runLoader();
 
-        const lenis = new Lenis({ lerp: 0.07, smoothWheel: true });
+        lenis = new Lenis({ lerp: 0.07, smoothWheel: true });
         gsap.ticker.add((time) => lenis.raf(time * 1000));
         gsap.ticker.lagSmoothing(0);
         lenis.on('scroll', ScrollTrigger.update);
