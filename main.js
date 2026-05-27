@@ -13,6 +13,7 @@
     const canvas = document.getElementById('cosmos');
     const ctx    = canvas.getContext('2d');
     let stars = [], shootingStars = [], W, H;
+    let collapseOriginX = 0, collapseOriginY = 0;
 
     function resize() {
         W = canvas.width  = window.innerWidth;
@@ -56,8 +57,8 @@
         const py = (mouse.y - H / 2) * 0.01;
         const pullRadius   = Math.max(200, cursorSize * 3.5);
         const pullStrength = 14 + scrollProgress * 55;
-        const collapseCX   = W / 2;
-        const collapseCY   = H / 2;
+        const collapseCX   = collapseTriggered ? collapseOriginX : W / 2;
+        const collapseCY   = collapseTriggered ? collapseOriginY : H / 2;
 
         for (const s of stars) {
             s.pulse += s.pulseSpeed;
@@ -264,26 +265,31 @@
     }
 
     function animateHalo() {
-        const targetSize = 10 + scrollProgress * scrollProgress * 220;
-        cursorSize += (targetSize - cursorSize) * 0.07;
+        const targetSize = collapseTriggered
+            ? 700
+            : 10 + scrollProgress * scrollProgress * 220;
+        cursorSize += (targetSize - cursorSize) * (collapseTriggered ? 0.025 : 0.07);
 
-        const lerpFactor = Math.max(0.022, 0.11 - scrollProgress * 0.088);
+        const lerpFactor = collapseTriggered
+            ? 0.004
+            : Math.max(0.022, 0.11 - scrollProgress * 0.088);
         fx += (mouse.x - fx) * lerpFactor;
         fy += (mouse.y - fy) * lerpFactor;
 
-        if (cursor && !collapseTriggered) {
+        if (cursor) {
             cursor.style.width     = cursorSize + 'px';
             cursor.style.height    = cursorSize + 'px';
-            const glow             = scrollProgress * 18;
-            cursor.style.boxShadow = `0 0 ${6 + glow}px rgba(200,255,0,${0.2 + scrollProgress * 0.25})`;
+            const glow             = collapseTriggered ? cursorSize * 0.14 : scrollProgress * 18;
+            const alpha            = collapseTriggered ? 0.4 : 0.2 + scrollProgress * 0.25;
+            cursor.style.boxShadow = `0 0 ${6 + glow}px rgba(200,255,0,${alpha})`;
         }
-        if (halo && !collapseTriggered) {
+        if (halo) {
             halo.style.left        = fx + 'px';
             halo.style.top         = fy + 'px';
             const haloSize         = Math.max(44, cursorSize * 3.8);
             halo.style.width       = haloSize + 'px';
             halo.style.height      = haloSize + 'px';
-            const haloAlpha        = 0.1 + scrollProgress * 0.12;
+            const haloAlpha        = collapseTriggered ? 0.05 : 0.1 + scrollProgress * 0.12;
             halo.style.borderColor = `rgba(200,255,0,${haloAlpha})`;
         }
 
@@ -333,67 +339,47 @@
     // ── Site Collapse ──
     window._voidCollapse = function () {
         if (collapseTriggered) return;
+
+        // Lock collapse origin at current cursor/halo position
+        collapseOriginX = fx;
+        collapseOriginY = fy;
         collapseTriggered = true;
 
         const section = document.querySelector('.section-choice');
-        const absorb  = document.querySelectorAll(
+        const footer  = document.querySelector('.section-choice .footer');
+        const textEls = document.querySelectorAll(
             '.beyond-num, .beyond-label.revealed, ' +
             '.beyond-title .rline.revealed, ' +
             '.beyond-question.revealed, .beyond-manifesto.revealed'
         );
-        const cta    = document.getElementById('beyondCta');
-        const footer = document.querySelector('.section-choice .footer');
 
-        // Hide cursor + halo
-        if (cursor) gsap.to(cursor, { opacity: 0, duration: 0.6, ease: 'power2.out' });
-        if (halo)   gsap.to(halo,   { opacity: 0, duration: 0.8, ease: 'power2.out' });
+        // Background bleeds to void
+        gsap.to(section, { backgroundColor: '#060608', duration: 1.6, ease: 'power2.inOut' });
+        if (footer) gsap.to(footer, { opacity: 0, duration: 0.5, delay: 0.1 });
 
-        // Fade white background to void
-        gsap.to(section, {
-            backgroundColor: '#060608',
-            duration: 1.6,
-            ease: 'power2.inOut',
-        });
-
-        // Footer disappears too
-        if (footer) gsap.to(footer, { opacity: 0, duration: 0.8, delay: 0.2 });
-
-        // All text collapses into center
-        gsap.to(absorb, {
-            scale:   0.01,
-            opacity: 0,
-            duration: 2,
-            delay:    0.3,
-            ease:    'power4.in',
-            stagger:  0.055,
-            transformOrigin: 'center center',
-        });
-
-        // CTA: kill CSS transition, hide immediately, then reveal in void colors
-        if (cta) {
-            gsap.killTweensOf(cta);
-            gsap.set(cta, { opacity: 0, y: 0 });
-            gsap.to(cta, {
-                opacity:     1,
-                color:       '#dddde8',
-                borderColor: 'rgba(200,255,0,0.45)',
-                duration:    1,
-                delay:       2.4,
-                ease:        'power2.out',
+        // Suck every text element toward the cursor position
+        textEls.forEach((el, i) => {
+            el.style.translate = ''; // clear any absorbText offset
+            const rect = el.getBoundingClientRect();
+            const dx = collapseOriginX - (rect.left + rect.width  * 0.5);
+            const dy = collapseOriginY - (rect.top  + rect.height * 0.5);
+            gsap.to(el, {
+                x:       dx,
+                y:       dy,
+                scale:   0.01,
+                opacity: 0,
+                duration: 1.4 + i * 0.04,
+                delay:   0.08 + i * 0.07,
+                ease:    'power3.in',
             });
-            cta.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.location.reload();
-            }, { once: true, capture: true });
-        }
+        });
 
         // Drive canvas collapse
         const proxy = { p: 0 };
         gsap.to(proxy, {
             p:        1,
             duration: 4,
-            ease:    'power2.in',
+            ease:     'power2.in',
             onUpdate() { collapseProgress = proxy.p; },
         });
     };
