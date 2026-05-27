@@ -176,7 +176,7 @@ body:has(a:hover) .cursor-halo {
     align-items: center;
     z-index: 2;
     padding: 120px 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .section-inner {
@@ -310,10 +310,8 @@ body:has(a:hover) .cursor-halo {
 .hero-t2,
 .hero-t3 {
     display: block;
-    overflow: hidden;
+    overflow: visible;
 }
-
-.hero-t3 { overflow: visible; }
 
 .hero-t1 span,
 .hero-t2 span {
@@ -404,8 +402,6 @@ body:has(a:hover) .cursor-halo {
 }
 
 /* ── Origin Visual (Ignition section) ── */
-.section-ignition { overflow: visible; }
-
 .origin-visual {
     position: absolute;
     right: 0;

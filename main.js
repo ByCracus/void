@@ -219,9 +219,10 @@
 
     const ABSORB_SEL =
         '.section-num, .section-label, .nav-logo, ' +
-        '.rline.revealed, [data-reveal-fade].revealed, ' +
-        '.section-desc, .beyond-num, #scrollHint, ' +
-        '.hero-eyebrow, .hero-sub';
+        '.section-heading, .section-desc, .origin-visual, ' +
+        '.hero-title, .hero-eyebrow, .hero-sub, #scrollHint, ' +
+        '.beyond-num, .beyond-title, ' +
+        '[data-reveal-fade].revealed';
 
     function absorbText() {
         if (cursorSize < 22) {
