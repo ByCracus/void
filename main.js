@@ -214,8 +214,9 @@
     }
 
     // ── Text Absorption ──
-    const absorbState = new Map();
-    const absorbed    = new Set();   // permanently consumed elements
+    const absorbState     = new Map();
+    const absorbed        = new Set();   // permanently consumed elements
+    const consumedSections = new Set();  // sections eaten while scrolling up
 
     const ABSORB_SEL =
         '.section-num, .section-label, .nav-logo, ' +
@@ -351,6 +352,24 @@
 
     window._voidScramble = scramble;
 
+    // ── Eat a section toward the cursor ──
+    function eatSection(sec) {
+        const cx = fx, cy = fy;
+        sec.querySelectorAll('.section-inner, .section-num, .origin-visual, .hero-content, #scrollHint')
+            .forEach((el, i) => {
+                el.style.translate = '';
+                const r  = el.getBoundingClientRect();
+                const dx = cx - (r.left + r.width  * 0.5);
+                const dy = cy - (r.top  + r.height * 0.5);
+                gsap.to(el, {
+                    x: dx, y: dy, scale: 0.01, opacity: 0,
+                    duration: 1.2,
+                    delay:    i * 0.09,
+                    ease:     'power3.in',
+                });
+            });
+    }
+
     // ── Site Collapse ──
     window._voidCollapse = function () {
         if (collapseTriggered) return;
@@ -407,12 +426,8 @@
             });
         });
 
-        // ── Consume every section above (void spreads upward) ──
+        // Nav disappears — sections above are eaten when the user scrolls up
         gsap.to('#nav', { opacity: 0, duration: 0.7, delay: 0.3, ease: 'power2.in' });
-        gsap.to('.section-paradox', { opacity: 0, duration: 1.0, delay: 0.5, ease: 'power2.in' });
-        gsap.to('.section-acceleration', { opacity: 0, duration: 1.0, delay: 0.75, ease: 'power2.in' });
-        gsap.to('.section-ignition',     { opacity: 0, duration: 1.0, delay: 1.0,  ease: 'power2.in' });
-        gsap.to('.section-hero',         { opacity: 0, duration: 1.0, delay: 1.25, ease: 'power2.in' });
 
         // ── Drive canvas collapse ──
         const proxy = { p: 0 };
@@ -533,6 +548,24 @@
         gsap.ticker.add((time) => lenis.raf(time * 1000));
         gsap.ticker.lagSmoothing(0);
         lenis.on('scroll', ScrollTrigger.update);
+
+        // Eat sections in order as user scrolls back up after collapse
+        const upSections = ['.section-paradox', '.section-acceleration', '.section-ignition', '.section-hero']
+            .map(s => document.querySelector(s)).filter(Boolean);
+        let lastScroll = 0;
+        lenis.on('scroll', ({ scroll }) => {
+            const goingUp = scroll < lastScroll;
+            lastScroll = scroll;
+            if (!collapseTriggered || !goingUp) return;
+            upSections.forEach(sec => {
+                if (consumedSections.has(sec)) return;
+                const r = sec.getBoundingClientRect();
+                if (r.bottom > 0 && r.top < window.innerHeight) {
+                    consumedSections.add(sec);
+                    eatSection(sec);
+                }
+            });
+        });
 
         document.querySelectorAll('a[href^="#"]').forEach((a) => {
             a.addEventListener('click', (e) => {
