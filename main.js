@@ -357,6 +357,7 @@
         const cx = fx, cy = fy;
         sec.querySelectorAll('.section-inner, .section-num, .origin-visual, .hero-content, #scrollHint')
             .forEach((el, i) => {
+                gsap.killTweensOf(el);
                 el.style.translate = '';
                 const r  = el.getBoundingClientRect();
                 const dx = cx - (r.left + r.width  * 0.5);
@@ -378,6 +379,10 @@
         collapseOriginX = fx;
         collapseOriginY = fy;
         collapseTriggered = true;
+
+        // Kill all scroll-driven scrubs — they'd fight eatSection on every tick
+        ScrollTrigger.getAll().forEach(st => st.kill());
+        gsap.to('#progressBar', { opacity: 0, duration: 0.3 });
 
         // Stop scroll during collapse, re-enable after so user can slide up to void
         if (lenis) {
@@ -553,7 +558,10 @@
         const upSections = ['.section-paradox', '.section-acceleration', '.section-ignition', '.section-hero']
             .map(s => document.querySelector(s)).filter(Boolean);
         let lastScroll = 0;
-        lenis.on('scroll', ({ scroll }) => {
+        // Use window.scrollY directly — Lenis v1.x passes the instance, not { scroll }
+        // Always update lastScroll so it's seeded correctly by the time collapse fires
+        lenis.on('scroll', () => {
+            const scroll = window.scrollY;
             const goingUp = scroll < lastScroll;
             lastScroll = scroll;
             if (!collapseTriggered || !goingUp) return;
